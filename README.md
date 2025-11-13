@@ -48,7 +48,7 @@ pnpm send-deployment-tx contracts/deployement-data/module/social-recovery/0.1.0.
 Deployment data files are located in `contracts/deployement-data/` and contain:
 - `to`: The Safe Singleton Factory address
 - `data`: The deployment transaction data (hex-encoded bytecode)
-- `expected`: (Optional) The expected deployed contract address
+- `expectedAddress`: (Optional) The expectedAddress deployed contract address
 - `codeHash`: (Optional) The code hash for verification
 
 ## GitHub Actions
