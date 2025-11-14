@@ -1,4 +1,4 @@
-import { createWalletClient, createPublicClient, http, type Address, defineChain, type Chain } from "viem";
+import { createWalletClient, createPublicClient, http, type Address, defineChain, type Chain, formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import * as fs from "fs";
 import * as path from "path";
@@ -48,6 +48,7 @@ function saveDeploymentTransaction(
   txHash: `0x${string}`,
   blockNumber: bigint,
   networkName: string,
+  chainId: number | string,
   contractAddress?: Address,
   expectedAddress?: Address,
   gasUsed?: bigint
@@ -69,7 +70,7 @@ function saveDeploymentTransaction(
     gasUsed: gasUsed ? gasUsed.toString() : null,
     timestamp,
     network: networkName,
-    chainId: process.env.CHAIN_ID || "unknown",
+    chainId: chainId.toString(),
   };
 
   // Save individual contract deployment file
@@ -146,31 +147,19 @@ function createGitHubActionsSummary(
 }
 
 /**
- * Creates a custom chain from environment variables
- * Supports: CHAIN_ID, CHAIN_NAME, NATIVE_CURRENCY_NAME, NATIVE_CURRENCY_SYMBOL, 
+ * Creates a custom chain from fetched chain ID and environment variables
+ * Supports: CHAIN_NAME, NATIVE_CURRENCY_NAME, NATIVE_CURRENCY_SYMBOL, 
  * NATIVE_CURRENCY_DECIMALS, BLOCK_EXPLORER_URL
  */
-function createCustomChainFromEnv(rpcUrl: string): Chain | undefined {
-  const chainId = process.env.CHAIN_ID;
-  
-  if (!chainId) {
-    return undefined;
-  }
-
-  const chainIdNumber = parseInt(chainId, 10);
-  if (isNaN(chainIdNumber)) {
-    console.warn(`Invalid CHAIN_ID: ${chainId}. Expected a number.`);
-    return undefined;
-  }
-
-  const chainName = process.env.CHAIN_NAME || `Custom Chain ${chainIdNumber}`;
+function createCustomChain(rpcUrl: string, chainId: number): Chain {
+  const chainName = process.env.CHAIN_NAME || `Custom Chain ${chainId}`;
   const nativeCurrencyName = process.env.NATIVE_CURRENCY_NAME || "Ether";
   const nativeCurrencySymbol = process.env.NATIVE_CURRENCY_SYMBOL || "ETH";
   const nativeCurrencyDecimals = parseInt(process.env.NATIVE_CURRENCY_DECIMALS || "18", 10);
   const blockExplorerUrl = process.env.BLOCK_EXPLORER_URL;
 
   const chain = defineChain({
-    id: chainIdNumber,
+    id: chainId,
     name: chainName,
     nativeCurrency: {
       name: nativeCurrencyName,
@@ -192,7 +181,7 @@ function createCustomChainFromEnv(rpcUrl: string): Chain | undefined {
     }),
   });
 
-  console.log(`Created custom chain: ${chainName} (ID: ${chainIdNumber})`);
+  console.log(`Created custom chain: ${chainName} (ID: ${chainId})`);
   return chain;
 }
 
@@ -203,7 +192,8 @@ async function deployContract(
   contractName: string,
   account: ReturnType<typeof privateKeyToAccount>,
   chain: Chain | undefined,
-  networkName: string
+  networkName: string,
+  chainId: number
 ): Promise<DeploymentResult> {
   const result: DeploymentResult = {
     contractName,
@@ -277,29 +267,6 @@ async function deployContract(
       }
     }
 
-    // Get current nonce
-    const nonce = await publicClient.getTransactionCount({ address: account.address });
-    console.log("Current nonce:", nonce);
-
-    // Get gas price
-    const gasPrice = await publicClient.getGasPrice();
-    console.log("Gas price:", gasPrice.toString(), "wei");
-
-    // Estimate gas (optional, may fail for some transactions)
-    let gasLimit: bigint;
-    try {
-      gasLimit = await publicClient.estimateGas({
-        to: deploymentData.to,
-        data: deploymentData.data,
-        account,
-      });
-      console.log("Estimated gas:", gasLimit.toString());
-    } catch (error) {
-      console.log("Gas estimation failed, using default:", error);
-      // Use a high gas limit for deployment transactions
-      gasLimit = BigInt(5000000);
-    }
-
     // Send transaction
     console.log("\nSending transaction...");
     const hash = await client.sendTransaction({
@@ -347,6 +314,7 @@ async function deployContract(
         hash,
         receipt.blockNumber,
         networkName,
+        chainId,
         receipt.contractAddress || deploymentData.expectedAddress,
         deploymentData.expectedAddress,
         receipt.gasUsed
@@ -366,10 +334,10 @@ async function deployContract(
     if (error.message) {
       console.error("Error:", error.message);
     }
-    if (error.cause) {
-      console.error("Cause:", error.cause);
-    }
-    console.error("Full error:", error);
+    // if (error.cause) {
+    //   console.error("Cause:", error.cause);
+    // }
+    // console.error("Full error:", error);
   }
 
   return result;
@@ -424,21 +392,6 @@ async function main() {
   // Create account from private key
   const account = privateKeyToAccount(privateKey as `0x${string}`);
 
-  // Create custom chain from environment variables if CHAIN_ID is provided
-  const customChain = createCustomChainFromEnv(rpcUrl);
-
-  // Create clients
-  const client = createWalletClient({
-    account,
-    transport: http(rpcUrl),
-    chain: customChain,
-  });
-
-  const publicClient = createPublicClient({
-    transport: http(rpcUrl),
-    chain: customChain,
-  });
-
   // GitHub Actions output formatting
   const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
@@ -455,9 +408,46 @@ async function main() {
   }
   console.log("Deployment directory:", canonicalDir);
 
-  // Get chain ID
-  const chainId = await publicClient.getChainId();
-  console.log("Chain ID:", chainId);
+  // Create a temporary public client to fetch chain ID from RPC
+  const tempPublicClient = createPublicClient({
+    transport: http(rpcUrl),
+  });
+
+  // Fetch chain ID from RPC
+  console.log("Fetching chain ID from RPC...");
+  const chainId = await tempPublicClient.getChainId();
+  console.log("Chain ID (from RPC):", chainId);
+
+  // Create custom chain using the fetched chain ID
+  const customChain = createCustomChain(rpcUrl, chainId);
+
+  // Create clients with the proper chain configuration
+  const client = createWalletClient({
+    account,
+    transport: http(rpcUrl),
+    chain: customChain,
+  });
+
+  const publicClient = createPublicClient({
+    transport: http(rpcUrl),
+    chain: customChain,
+  });
+
+  // Get and display ETH balance
+  try {
+    const balance = await publicClient.getBalance({ address: account.address });
+    const balanceInEth = formatEther(balance);
+    console.log("ETH Balance:", balanceInEth, "ETH");
+    console.log("ETH Balance (wei):", balance.toString());
+    
+    // Set GitHub Actions output
+    if (isCI && process.env.GITHUB_OUTPUT) {
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `eth_balance_wei=${balance.toString()}\n`);
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `eth_balance_eth=${balanceInEth}\n`);
+    }
+  } catch (error: any) {
+    console.warn("⚠ Could not fetch ETH balance:", error.message);
+  }
 
   // Initialize deployment session ID for batch deployments
   if (!deploymentSessionId) {
@@ -526,7 +516,7 @@ async function main() {
         continue;
       }
 
-      const result = await deployContract(client, publicClient, deploymentData, file.name, account, customChain, networkName);
+      const result = await deployContract(client, publicClient, deploymentData, file.name, account, customChain, networkName, chainId);
       results.push(result);
 
       if (result.success) {
