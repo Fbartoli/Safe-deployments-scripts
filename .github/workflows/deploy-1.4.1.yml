@@ -86,7 +86,9 @@ jobs:
           echo "::notice::Deploying Safe 1.4.1 contracts..."
           echo "Chain ID: $CHAIN_ID"
           echo "Network: ${NETWORK:-custom}"
-          echo "RPC URL: ${CUSTOM_RPC_URL:0:30}..." # Mask for security
+          # Mask RPC URL - show only protocol and hostname
+          RPC_MASKED=$(echo "$CUSTOM_RPC_URL" | sed -E 's|(https?://[^/?#]+).*|\1/***|')
+          echo "RPC URL: $RPC_MASKED"
           
           if [ -n "$BLOCK_EXPLORER_URL" ]; then
             echo "Block Explorer: $BLOCK_EXPLORER_URL"

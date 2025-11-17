@@ -402,17 +402,28 @@ async function main() {
   // GitHub Actions output formatting
   const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
+  // Helper function to mask RPC URL for security
+  const maskRpcUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      // Show protocol and hostname, mask path and query params
+      const protocol = urlObj.protocol;
+      const hostname = urlObj.hostname;
+      const port = urlObj.port ? `:${urlObj.port}` : '';
+      // Mask any API keys in path or query
+      return `${protocol}//${hostname}${port}${urlObj.pathname ? '/***' : ''}${urlObj.search ? '?***' : ''}`;
+    } catch {
+      // If URL parsing fails, mask everything except first few chars
+      return url.length > 10 ? `${url.substring(0, 10)}...` : '***';
+    }
+  };
+
   console.log("\n" + "=".repeat(60));
   console.log("Safe 1.3.0 Canonical Deployment Script");
   console.log("=".repeat(60));
   console.log("Deployer address:", account.address);
   console.log("Network:", networkName);
-  if (isCI) {
-    const maskedRpc = rpcUrl.length > 20 ? `${rpcUrl.substring(0, 20)}...` : rpcUrl;
-    console.log("RPC URL:", maskedRpc);
-  } else {
-    console.log("RPC URL:", rpcUrl);
-  }
+  console.log("RPC URL:", maskRpcUrl(rpcUrl));
   console.log("Deployment directory:", canonicalDir);
 
   // Create a temporary public client to fetch chain ID from RPC
