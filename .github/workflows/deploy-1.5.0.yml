@@ -3,10 +3,6 @@ name: Deploy Safe 1.5.0 Contracts
 on:
   workflow_dispatch:
     inputs:
-      chain_id:
-        description: 'Chain ID (e.g., 11155111 for Sepolia)'
-        required: true
-        type: string
       custom_rpc_url:
         description: 'Custom RPC URL for the network'
         required: true
@@ -62,7 +58,6 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           CUSTOM_RPC_URL: ${{ github.event.inputs.custom_rpc_url }}
-          CHAIN_ID: ${{ github.event.inputs.chain_id }}
           BLOCK_EXPLORER_URL: ${{ github.event.inputs.block_explorer_url }}
           NETWORK: ${{ github.event.inputs.network_name }}
           CI: true
@@ -78,14 +73,9 @@ jobs:
             exit 1
           fi
           
-          if [ -z "$CHAIN_ID" ]; then
-            echo "::error::CHAIN_ID is required"
-            exit 1
-          fi
-          
           echo "::notice::Deploying Safe 1.5.0 contracts..."
-          echo "Chain ID: $CHAIN_ID"
           echo "Network: ${NETWORK:-custom}"
+          echo "Chain ID will be fetched from RPC..."
           # Mask RPC URL - show only protocol and hostname
           RPC_MASKED=$(echo "$CUSTOM_RPC_URL" | sed -E 's|(https?://[^/?#]+).*|\1/***|')
           echo "RPC URL: $RPC_MASKED"
@@ -101,7 +91,6 @@ jobs:
         run: |
           echo "## Safe 1.5.0 Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Chain ID**: ${{ github.event.inputs.chain_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Network**: ${{ github.event.inputs.network_name || 'custom' }}" >> $GITHUB_STEP_SUMMARY
           if [ -n "${{ github.event.inputs.block_explorer_url }}" ]; then
             echo "- **Block Explorer**: ${{ github.event.inputs.block_explorer_url }}" >> $GITHUB_STEP_SUMMARY
@@ -116,9 +105,14 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             
             # Read from JSON file
+            CHAIN_ID=$(jq -r '.chainId // "N/A"' "$SUMMARY_FILE")
             TOTAL=$(jq -r '.totalContracts // 0' "$SUMMARY_FILE")
             SUCCESS=$(jq -r '.successful // 0' "$SUMMARY_FILE")
             FAILED=$(jq -r '.failed // 0' "$SUMMARY_FILE")
+            
+            if [ "$CHAIN_ID" != "N/A" ] && [ "$CHAIN_ID" != "null" ]; then
+              echo "- **Chain ID**: $CHAIN_ID" >> $GITHUB_STEP_SUMMARY
+            fi
             
             if [ "$TOTAL" -gt 0 ]; then
               echo "- **Total Contracts**: $TOTAL" >> $GITHUB_STEP_SUMMARY
