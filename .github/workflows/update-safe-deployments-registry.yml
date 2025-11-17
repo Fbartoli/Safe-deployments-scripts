@@ -24,8 +24,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
-  workflows: write
+  actions: read
 
 jobs:
   update-registry:
@@ -36,14 +35,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt
-          key: ${{ runner.os }}-apt-${{ hashFiles('/etc/apt/sources.list', '/etc/apt/sources.list.d/*') }}
-          restore-keys: |
-            ${{ runner.os }}-apt-
 
       - name: Install jq
         run: |
@@ -94,12 +85,12 @@ jobs:
       - name: Download deployment summary artifact
         id: download-artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ steps.workflow-info.outputs.artifact_name }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
           path: ./deployment-artifacts
-          if-no-files-found: warn
 
       - name: Extract deployment information
         id: extract-info
