@@ -273,14 +273,6 @@ All deployments use the following deployer address:
    # Address: 0x60Ef2a0FcaA3EC855Be207ADc544F7E4EA005408
    ```
 
-### Estimated Gas Costs
-
-- **Safe Smart Account contracts**: ~0.01-0.05 ETH per contract (varies by network)
-- **Safe Modules**: ~0.005-0.02 ETH per module (varies by network)
-- **Batch deployments**: Sum of individual contract costs
-
-> 💡 **Tip**: Start with a small test deployment to estimate actual gas costs for your network.
-
 ## License
 
 Private repository
