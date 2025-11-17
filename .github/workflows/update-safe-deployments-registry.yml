@@ -5,7 +5,7 @@ name: Update Safe Deployments Registry
 #
 # Required Secret:
 #   SAFE_DEPLOYMENTS_1_TOKEN - A GitHub Personal Access Token (PAT) with workflow permissions
-#   to trigger workflows in the safe-global/safe-deployments repository.
+#   to trigger workflows in the Fbartoli/safe-deployments repository.
 #
 # Setup:
 #   1. Create a GitHub PAT with 'workflow' scope
@@ -166,7 +166,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SAFE_DEPLOYMENTS_1_TOKEN }}
         run: |
           # Use GitHub API to trigger the workflow_dispatch event
-          REPO="safe-global/safe-deployments"
+          REPO="Fbartoli/safe-deployments"
           WORKFLOW_FILE="update-registry.yml"
           
           echo "Triggering workflow: $WORKFLOW_FILE in $REPO"
@@ -264,11 +264,11 @@ jobs:
           else
             echo "✅ **Successfully triggered update-registry workflow**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "- **Repository**: safe-global/safe-deployments" >> $GITHUB_STEP_SUMMARY
+            echo "- **Repository**: Fbartoli/safe-deployments" >> $GITHUB_STEP_SUMMARY
             echo "- **Version**: ${{ steps.workflow-info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Chain ID**: ${{ steps.extract-info.outputs.chain_id }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Network**: ${{ steps.extract-info.outputs.network }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the workflow run: https://github.com/safe-global/safe-deployments/actions" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow run: https://github.com/Fbartoli/safe-deployments/actions" >> $GITHUB_STEP_SUMMARY
           fi
 
