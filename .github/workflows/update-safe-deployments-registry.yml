@@ -178,6 +178,31 @@ jobs:
             exit 1
           fi
           
+          # Test token permissions by checking repository access
+          echo "Testing token permissions..."
+          TEST_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO")
+          
+          TEST_HTTP_CODE=$(echo "$TEST_RESPONSE" | tail -n1)
+          TEST_BODY=$(echo "$TEST_RESPONSE" | head -n-1)
+          
+          if [ "$TEST_HTTP_CODE" -ne 200 ]; then
+            echo "::error::Token cannot access repository. HTTP $TEST_HTTP_CODE"
+            echo "Response: $TEST_BODY"
+            echo ""
+            echo "Troubleshooting:"
+            echo "1. Make sure your PAT has 'workflow' scope enabled"
+            echo "2. Make sure your PAT has 'repo' scope enabled (required for triggering workflows)"
+            echo "3. Verify the token has access to the repository: $REPO"
+            echo "4. Check if the repository is private and the token has access"
+            exit 1
+          fi
+          
+          echo "✅ Token has repository access"
+          
           # Get workflow ID
           WORKFLOW_RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "Accept: application/vnd.github+json" \
@@ -243,6 +268,25 @@ jobs:
           else
             echo "::error::Failed to trigger workflow. HTTP $DISPATCH_HTTP_CODE"
             echo "Response: $DISPATCH_BODY"
+            echo ""
+            echo "Troubleshooting steps:"
+            echo "1. Verify your PAT has 'workflow' scope:"
+            echo "   - Go to GitHub Settings → Developer settings → Personal access tokens"
+            echo "   - Edit your token and ensure 'workflow' scope is checked"
+            echo ""
+            echo "2. Verify your PAT has 'repo' scope (required for triggering workflows):"
+            echo "   - The 'repo' scope is needed even for public repositories to trigger workflows"
+            echo ""
+            echo "3. Check if the workflow file exists:"
+            echo "   - Verify .github/workflows/update-registry.yml exists in $REPO"
+            echo ""
+            echo "4. Verify the workflow is enabled:"
+            echo "   - Go to $REPO → Settings → Actions → General"
+            echo "   - Ensure 'Allow all actions and reusable workflows' is enabled"
+            echo ""
+            echo "5. For fine-grained tokens, ensure:"
+            echo "   - Repository access includes $REPO"
+            echo "   - Permissions → Actions is set to 'Read and write'"
             exit 1
           fi
 
